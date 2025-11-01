@@ -5,4 +5,4 @@ opencv-python-headless
 pytesseract
 numpy
 pandas
-
+python-multipart
