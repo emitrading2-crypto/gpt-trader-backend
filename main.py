@@ -40,22 +40,21 @@ def home():
     return {"message": "✅ GPT Trader backend is running!"}
 
 # ===========================
-# 🧠 ANALIZADOR DE IMAGEN (Base64)
+# 🧠 ANALIZADOR DE IMAGEN (BASE64)
 # ===========================
 @app.post("/api/analyze-image", response_model=SignalResponse)
 def analyze_image(req: AnalyzeRequest):
-    """
-    Analiza una imagen enviada en formato base64 (desde MT5 o ChatGPT).
-    """
     try:
         if not req.image_b64 or len(req.image_b64) < 50:
-            raise ValueError("La cadena base64 está vacía o incompleta")
+            raise ValueError("Imagen vacía o base64 incompleto")
 
-        # Intentar decodificar imagen
-        image_data = base64.b64decode(req.image_b64.split(",")[-1])
-        img = Image.open(io.BytesIO(image_data))
+        # Validar formato base64
+        try:
+            image_data = base64.b64decode(req.image_b64.split(",")[-1])
+            Image.open(io.BytesIO(image_data))
+        except Exception:
+            raise ValueError("No se pudo decodificar la imagen correctamente")
 
-        # Procesar con el analizador de visión
         result = analyze_chart_image(req.image_b64)
         return result
 
@@ -63,39 +62,9 @@ def analyze_image(req: AnalyzeRequest):
         return {
             "signal": "ERROR",
             "pattern": None,
-            "reason": f"Error al analizar imagen: {str(e)}",
-            "warnings": [
-                "El backend no pudo decodificar la imagen. Asegúrate de que esté en formato PNG o JPG válido."
-            ],
+            "reason": f"Error analizando imagen: {str(e)}",
+            "warnings": ["El backend no pudo procesar la imagen. Usa formato PNG/JPG y revisa que esté completa."],
         }
-
-# ===========================
-# 🧩 ANALIZADOR DE ARCHIVOS (Upload)
-# ===========================
-@app.post("/api/analyze-file", response_model=SignalResponse)
-async def analyze_file(file: UploadFile = File(...)):
-    """
-    Analiza una imagen enviada como archivo (PNG/JPG).
-    """
-    try:
-        contents = await file.read()
-
-        # Validar tipo
-        if file.content_type not in ["image/png", "image/jpeg"]:
-            raise HTTPException(status_code=400, detail="Formato no soportado. Usa PNG o JPG.")
-
-        # Validar lectura
-        img = Image.open(io.BytesIO(contents))
-        buffer = io.BytesIO()
-        img.save(buffer, format="PNG")
-        img_str = base64.b64encode(buffer.getvalue()).decode("utf-8")
-
-        # Procesar
-        result = analyze_chart_image(img_str)
-        return result
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error procesando archivo: {str(e)}")
 
 # ===========================
 # 💰 CÁLCULO DE TAMAÑO DE POSICIÓN
