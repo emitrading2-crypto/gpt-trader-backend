@@ -1,7 +1,7 @@
 # main.py
 from fastapi import FastAPI
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 
 app = FastAPI(title="GPT Trader Backend")
 
@@ -22,7 +22,7 @@ class SignalResponse(BaseModel):
     reason: Optional[str] = None
     risk_percent: Optional[float] = None
     rr: Optional[float] = None
-    warnings: Optional[list] = []
+    warnings: Optional[List[str]] = []
 
 @app.get("/")
 def home():
@@ -55,4 +55,24 @@ def position_size(account_balance: float, risk_percent: float, entry: float, sto
 @app.get("/api/news-scan")
 def news_scan():
     return {
-        "ranked":
+        "ranked": [
+            {
+                "symbol": "XAUUSD",
+                "score": 0.82,
+                "drivers": ["Tensiones geopolíticas"],
+                "risk_flags": []
+            },
+            {
+                "symbol": "EURUSD",
+                "score": 0.67,
+                "drivers": ["Datos PMI Europa"],
+                "risk_flags": ["Reunión del BCE en 1h"]
+            },
+            {
+                "symbol": "BTCUSDT",
+                "score": 0.55,
+                "drivers": ["Flujos ETF"],
+                "risk_flags": []
+            }
+        ]
+    }
