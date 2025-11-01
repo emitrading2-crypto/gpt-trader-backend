@@ -2,10 +2,13 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import Optional, List
+import importlib
 
 app = FastAPI(title="GPT Trader Backend")
 
-# Modelos
+# ===========================
+# 📦 MODELOS DE DATOS
+# ===========================
 class AnalyzeRequest(BaseModel):
     image_b64: str
     fallback_symbol: Optional[str] = None
@@ -23,6 +26,10 @@ class SignalResponse(BaseModel):
     risk_percent: Optional[float] = None
     rr: Optional[float] = None
     warnings: Optional[List[str]] = []
+
+# ===========================
+# 🌐 ENDPOINTS PRINCIPALES
+# ===========================
 
 @app.get("/")
 def home():
@@ -76,7 +83,10 @@ def news_scan():
             }
         ]
     }
-from data_analyzer import analyze  # importa tu analizador
+
+# ===========================
+# ⚙️ ANALIZADOR DE MERCADO
+# ===========================
 
 @app.get("/api/market-signal")
 def market_signal(symbol: str = "EURUSD", timeframe: str = "H1"):
@@ -84,13 +94,28 @@ def market_signal(symbol: str = "EURUSD", timeframe: str = "H1"):
     Endpoint que devuelve una señal de trading simulada o real según el analizador.
     """
     try:
-        result = analyze(symbol, timeframe)
+        analyzer = importlib.import_module("data_analyzer")
+        result = analyzer.analyze(symbol, timeframe)
+        return {"ok": True, "data": result}
+    except ModuleNotFoundError:
+        # Si no encuentra el archivo data_analyzer.py
         return {
             "ok": True,
-            "data": result
+            "data": {
+                "symbol": symbol,
+                "timeframe": timeframe,
+                "signal": "LONG",
+                "confidence": 0.8,
+                "reason": "Simulación: EMA200 y RSI alcistas",
+            },
+            "warning": "⚠️ Módulo data_analyzer no encontrado; usando simulación."
         }
     except Exception as e:
-        return {
-            "ok": False,
-            "error": str(e)
-        }
+        return {"ok": False, "error": str(e)}
+
+# ===========================
+# 🚀 AUTOEJECUCIÓN LOCAL
+# ===========================
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="0.0.0.0", port=8000)
