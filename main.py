@@ -76,3 +76,21 @@ def news_scan():
             }
         ]
     }
+from data_analyzer import analyze  # importa tu analizador
+
+@app.get("/api/market-signal")
+def market_signal(symbol: str = "EURUSD", timeframe: str = "H1"):
+    """
+    Endpoint que devuelve una señal de trading simulada o real según el analizador.
+    """
+    try:
+        result = analyze(symbol, timeframe)
+        return {
+            "ok": True,
+            "data": result
+        }
+    except Exception as e:
+        return {
+            "ok": False,
+            "error": str(e)
+        }
