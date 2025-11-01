@@ -1,7 +1,8 @@
-fastapi
-uvicorn
-pillow
-opencv-python-headless
-pytesseract
-numpy
-pandas
+fastapi==0.115.0
+uvicorn==0.30.3
+pydantic==2.7.4
+python-multipart==0.0.9
+Pillow==10.3.0
+opencv-python-headless==4.10.0.84
+pytesseract==0.3.10
+
