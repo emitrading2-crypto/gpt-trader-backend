@@ -1,8 +1,7 @@
-from fastapi import FastAPI, UploadFile, File, Form, Body
+from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import Optional, List
-import importlib, base64, io
-from PIL import Image
+import importlib
 
 # Importa tu analizador de visión
 from vision_analyzer import analyze_chart_image
@@ -30,9 +29,8 @@ class SignalResponse(BaseModel):
     rr: Optional[float] = None
     warnings: Optional[List[str]] = []
 
-
 # ===========================
-# 🌐 ENDPOINT PRINCIPAL
+# 🌐 ENDPOINTS PRINCIPALES
 # ===========================
 @app.get("/")
 def home():
@@ -42,78 +40,17 @@ def home():
 # ===========================
 # 🧠 ANALIZADOR DE IMAGEN (VISION)
 # ===========================
-def _decode_b64_image(image_b64: str) -> bytes:
-    if "," in image_b64 and ";base64" in image_b64:
-        image_b64 = image_b64.split(",", 1)[1]
-    return base64.b64decode(image_b64)
-
-def _ensure_pillow_image(img_bytes: bytes) -> Image.Image:
-    im = Image.open(io.BytesIO(img_bytes))
-    if im.mode not in ("RGB", "RGBA", "L"):
-        im = im.convert("RGB")
-    elif im.mode == "RGBA":
-        im = im.convert("RGB")
-    return im
-
-
 @app.post("/api/analyze-image", response_model=SignalResponse)
-async def analyze_image(
-    # Soporte para multipart/form-data
-    file: UploadFile | None = File(default=None),
-    fallback_symbol_form: Optional[str] = Form(default=None),
-    fallback_timeframe_form: Optional[str] = Form(default=None),
-
-    # Soporte para JSON directo
-    image_b64_json: Optional[str] = Body(default=None, embed=True),
-    fallback_symbol_json: Optional[str] = Body(default=None, embed=True),
-    fallback_timeframe_json: Optional[str] = Body(default=None, embed=True),
-):
-    """
-    Acepta:
-    - multipart/form-data: file (PNG/JPG) + fallbacks opcionales
-    - application/json: { image_b64, fallback_symbol, fallback_timeframe }
-    """
+def analyze_image(req: AnalyzeRequest):
     try:
-        img_bytes = None
-        symbol = fallback_symbol_form or fallback_symbol_json
-        timeframe = fallback_timeframe_form or fallback_timeframe_json
-
-        if file is not None:
-            img_bytes = await file.read()
-        elif image_b64_json:
-            img_bytes = _decode_b64_image(image_b64_json)
-
-        if not img_bytes:
-            return {
-                "signal": "NEUTRAL",
-                "pattern": None,
-                "confidence": 0,
-                "reason": "No se recibió archivo ni image_b64.",
-                "warnings": ["missing_image"]
-            }
-
-        # Convertir imagen a formato correcto
-        pil_img = _ensure_pillow_image(img_bytes)
-
-        # Intentar usar vision_analyzer
-        try:
-            result = analyze_chart_image(pil_img)
-            return result
-        except Exception as inner_e:
-            return {
-                "signal": "ERROR",
-                "pattern": None,
-                "reason": f"Error interno en vision_analyzer: {inner_e}",
-                "warnings": ["vision_analyzer falló"]
-            }
-
+        result = analyze_chart_image(req.image_b64)
+        return result
     except Exception as e:
         return {
-            "signal": "NEUTRAL",
+            "signal": "ERROR",
             "pattern": None,
-            "confidence": 0,
-            "reason": f"Error al procesar la imagen: {e}",
-            "warnings": ["image_decode_error"]
+            "reason": str(e),
+            "warnings": ["Error al analizar la imagen con vision_analyzer.py"]
         }
 
 
@@ -147,9 +84,6 @@ def news_scan():
 # ===========================
 @app.get("/api/market-signal")
 def market_signal(symbol: str = "EURUSD", timeframe: str = "H1"):
-    """
-    Endpoint que devuelve una señal de trading simulada o real según el analizador.
-    """
     try:
         analyzer = importlib.import_module("data_analyzer")
         result = analyzer.analyze(symbol, timeframe)
@@ -176,3 +110,4 @@ def market_signal(symbol: str = "EURUSD", timeframe: str = "H1"):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000)
+
