@@ -1,8 +1,7 @@
 fastapi
 uvicorn
-pandas
+pillow
+opencv-python-headless
+pytesseract
 numpy
-ta
-scipy
-
-
+pandas
