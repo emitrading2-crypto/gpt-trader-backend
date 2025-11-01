@@ -1,8 +1,10 @@
-# main.py
 from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import Optional, List
 import importlib
+
+# Importa tu analizador de visión
+from vision_analyzer import analyze_chart_image
 
 app = FastAPI(title="GPT Trader Backend")
 
@@ -35,23 +37,31 @@ class SignalResponse(BaseModel):
 def home():
     return {"message": "✅ GPT Trader backend is running!"}
 
+
+# ===========================
+# 🧠 ANALIZADOR DE IMAGEN (VISION)
+# ===========================
 @app.post("/api/analyze-image", response_model=SignalResponse)
 def analyze_image(req: AnalyzeRequest):
-    # Simulación temporal
-    return {
-        "signal": "LONG",
-        "pattern": "Double Bottom",
-        "entry": 1.2345,
-        "stop": 1.2300,
-        "tp1": 1.2400,
-        "tp2": 1.2450,
-        "confidence": 85,
-        "reason": "EMA200 up, RSI 55, strong bullish reversal pattern",
-        "risk_percent": 0.75,
-        "rr": 2.0,
-        "warnings": []
-    }
+    """
+    Analiza una imagen en base64 proveniente de MT5, usando visión artificial
+    para detectar patrones (doble techo/suelo, HCH, etc.)
+    """
+    try:
+        result = analyze_chart_image(req.image_b64)
+        return result
+    except Exception as e:
+        return {
+            "signal": "ERROR",
+            "pattern": None,
+            "reason": str(e),
+            "warnings": ["Error al analizar la imagen con vision_analyzer.py"]
+        }
 
+
+# ===========================
+# 💰 CÁLCULO DE TAMAÑO DE POSICIÓN
+# ===========================
 @app.get("/api/position-size")
 def position_size(account_balance: float, risk_percent: float, entry: float, stop: float):
     risk_amount = account_balance * (risk_percent / 100.0)
@@ -59,6 +69,10 @@ def position_size(account_balance: float, risk_percent: float, entry: float, sto
     size = risk_amount / risk_per_unit if risk_per_unit else 0
     return {"size": round(size, 4), "risk_amount": round(risk_amount, 2)}
 
+
+# ===========================
+# 🗞️ ESCÁNER DE NOTICIAS
+# ===========================
 @app.get("/api/news-scan")
 def news_scan():
     return {
@@ -84,10 +98,10 @@ def news_scan():
         ]
     }
 
+
 # ===========================
 # ⚙️ ANALIZADOR DE MERCADO
 # ===========================
-
 @app.get("/api/market-signal")
 def market_signal(symbol: str = "EURUSD", timeframe: str = "H1"):
     """
@@ -98,7 +112,6 @@ def market_signal(symbol: str = "EURUSD", timeframe: str = "H1"):
         result = analyzer.analyze(symbol, timeframe)
         return {"ok": True, "data": result}
     except ModuleNotFoundError:
-        # Si no encuentra el archivo data_analyzer.py
         return {
             "ok": True,
             "data": {
@@ -113,9 +126,11 @@ def market_signal(symbol: str = "EURUSD", timeframe: str = "H1"):
     except Exception as e:
         return {"ok": False, "error": str(e)}
 
+
 # ===========================
 # 🚀 AUTOEJECUCIÓN LOCAL
 # ===========================
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000)
+
