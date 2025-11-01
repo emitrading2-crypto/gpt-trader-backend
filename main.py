@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form
 from pydantic import BaseModel
 from typing import Optional, List
 import importlib
@@ -14,11 +14,6 @@ app = FastAPI(title="GPT Trader Backend")
 # ===========================
 # 📦 MODELOS DE DATOS
 # ===========================
-class AnalyzeRequest(BaseModel):
-    image_b64: str
-    fallback_symbol: Optional[str] = None
-    fallback_timeframe: Optional[str] = None
-
 class SignalResponse(BaseModel):
     signal: str
     pattern: Optional[str] = None
@@ -40,30 +35,47 @@ def home():
     return {"message": "✅ GPT Trader backend is running!"}
 
 # ===========================
-# 🧠 ANALIZADOR DE IMAGEN (BASE64)
+# 🧠 ANALIZADOR DE IMAGEN (MULTIPART o BASE64)
 # ===========================
 @app.post("/api/analyze-image", response_model=SignalResponse)
-def analyze_image(req: AnalyzeRequest):
+async def analyze_image(
+    file: Optional[UploadFile] = File(None),
+    image_b64: Optional[str] = Form(None),
+    fallback_symbol: Optional[str] = Form(None),
+    fallback_timeframe: Optional[str] = Form(None)
+):
+    """
+    Analiza una imagen enviada por archivo o en base64.
+    Compatible con GPTs personalizados y llamadas directas.
+    """
     try:
-        if not req.image_b64 or len(req.image_b64) < 50:
-            raise ValueError("Imagen vacía o base64 incompleto")
+        # Si viene un archivo, lo convertimos a base64
+        if file:
+            content = await file.read()
+            image_b64 = base64.b64encode(content).decode("utf-8")
 
-        # Validar formato base64
+        if not image_b64:
+            raise ValueError("No se recibió imagen ni base64 válido")
+
+        # Validar que sea una imagen real
         try:
-            image_data = base64.b64decode(req.image_b64.split(",")[-1])
+            image_data = base64.b64decode(image_b64.split(",")[-1])
             Image.open(io.BytesIO(image_data))
         except Exception:
-            raise ValueError("No se pudo decodificar la imagen correctamente")
+            raise ValueError("No se pudo decodificar la imagen. Usa formato .png o .jpg")
 
-        result = analyze_chart_image(req.image_b64)
+        # Ejecutar análisis de visión
+        result = analyze_chart_image(image_b64)
+
+        # Devolver el resultado del analizador
         return result
 
     except Exception as e:
         return {
             "signal": "ERROR",
             "pattern": None,
-            "reason": f"Error analizando imagen: {str(e)}",
-            "warnings": ["El backend no pudo procesar la imagen. Usa formato PNG/JPG y revisa que esté completa."],
+            "reason": str(e),
+            "warnings": ["Error al analizar la imagen con vision_analyzer.py"]
         }
 
 # ===========================
